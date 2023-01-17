@@ -21,12 +21,13 @@ export class App extends Component {
   state = {
     image: [],
     search: '',
-    isLoading: false,
+
     page: 1,
     imageHits: [],
     showModal: false,
     url: '',
     alt: '',
+    status: 'idle',
   };
 
   handleSearch = search => {
@@ -45,7 +46,7 @@ export class App extends Component {
       prevState.search !== this.state.search ||
       prevState.page !== this.state.page
     ) {
-      this.setState({ isLoading: true });
+      this.setState({ status: 'pending' });
       try {
         const { data } = await axios.get(
           `${BASE_URL}q=${search}&page=${page}&key=${KEY}&image_type=photo&orientation=horizontal&per_page=12`
@@ -64,10 +65,10 @@ export class App extends Component {
           this.setState({ image: [] });
         }
       } catch (error) {
-        console.log(error);
+        this.setState({ status: 'rejected' });
         toast.error('Cannot process your request');
       } finally {
-        this.setState({ isLoading: false });
+        this.setState({ status: 'resolved' });
       }
     }
   }
@@ -83,33 +84,47 @@ export class App extends Component {
   };
 
   render() {
-    const { isLoading, image, imageHits, showModal, url, alt } = this.state;
+    const { image, imageHits, showModal, url, alt } = this.state;
 
-    return (
-      <Container>
-        <SearchBar onSubmit={this.handleSearch} />
+    if (this.state.status === 'idle') {
+      return <SearchBar onSubmit={this.handleSearch} />;
+    }
 
-        {
-          <ImageGallery>
-            {
-              <ImageGalleryItem
-                image={image}
-                onhandleModal={this.handleModal}
-              />
-            }
-          </ImageGallery>
-        }
-        {isLoading && <Loader />}
-        {<Toast />}
-        {showModal && (
-          <Modal onClose={this.toggleModal}>
-            <ModalInner url={url} alt={alt} />
-          </Modal>
-        )}
-        {image.length === 0 || imageHits.totalHits === image.length || (
-          <Button onClick={this.loadMore} />
-        )}
-      </Container>
-    );
+    if (this.state.status === 'pending') {
+      return <Loader />;
+    }
+
+    if (this.state.status === 'rejected') {
+      return toast.error('Cannot process your request');
+    }
+
+    if (this.state.status === 'resolved') {
+      return (
+        <Container>
+          <SearchBar onSubmit={this.handleSearch} />
+
+          {
+            <ImageGallery>
+              {
+                <ImageGalleryItem
+                  image={image}
+                  onhandleModal={this.handleModal}
+                />
+              }
+            </ImageGallery>
+          }
+
+          {<Toast />}
+          {showModal && (
+            <Modal onClose={this.toggleModal}>
+              <ModalInner url={url} alt={alt} />
+            </Modal>
+          )}
+          {image.length === 0 || imageHits.totalHits === image.length || (
+            <Button onClick={this.loadMore} />
+          )}
+        </Container>
+      );
+    }
   }
 }
